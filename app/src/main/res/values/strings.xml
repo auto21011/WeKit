@@ -198,6 +198,10 @@
     <string name="agent_send_while_running_title">Messages sent while running</string>
     <string name="agent_send_queue_after_turn">Queue (send after this turn)</string>
     <string name="agent_send_steer_next_request">Steer (insert before the next request)</string>
+    <string name="agent_llm_request_timeout_title">Model request timeout</string>
+    <string name="agent_llm_request_timeout_summary">Longest a single model call may take, streaming output included</string>
+    <string name="agent_llm_connect_timeout_title">Model connect timeout</string>
+    <string name="agent_llm_connect_timeout_summary">Longest time to establish the connection to the model server</string>
     <string name="agent_section_tools">Tools</string>
     <string name="agent_mcp_servers_title">MCP servers</string>
     <string name="agent_mcp_servers_summary">Add Streamable HTTP and SSE servers</string>

@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -24,11 +25,13 @@ import com.composables.icons.materialsymbols.outlined.Terminal
 import com.composables.icons.materialsymbols.outlined.Key
 import com.composables.icons.materialsymbols.outlined.Notes
 import com.composables.icons.materialsymbols.outlined.Notifications_active
+import com.composables.icons.materialsymbols.outlined.Schedule
 import com.composables.icons.materialsymbols.outlined.Search
 import com.composables.icons.materialsymbols.outlined.Send
 import com.composables.icons.materialsymbols.outlined.Shield
 import com.composables.icons.materialsymbols.outlined.Smart_display
 import com.composables.icons.materialsymbols.outlined.Smart_toy
+import com.composables.icons.materialsymbols.outlined.Sync
 import dev.ujhhgtg.wekit.ui.content.m3.SETTINGS_CONTENT_BOTTOM_INSET
 import dev.ujhhgtg.wekit.ui.content.m3.SettingsScaffold
 import dev.ujhhgtg.wekit.R
@@ -40,9 +43,11 @@ import dev.ujhhgtg.wekit.agent.tool.PermissionLevel
 import dev.ujhhgtg.wekit.agent.tool.ToolLoadingMode
 import dev.ujhhgtg.wekit.features.api.agent.WeAgentService
 import dev.ujhhgtg.wekit.features.items.system.agent.WeAgentOverlayController
+import dev.ujhhgtg.wekit.ui.content.m3.BaseItemContainer
 import dev.ujhhgtg.wekit.ui.content.m3.BaseWidget
 import dev.ujhhgtg.wekit.ui.content.m3.DropDownMenuWidget
 import dev.ujhhgtg.wekit.ui.content.m3.DropdownOption
+import dev.ujhhgtg.wekit.ui.content.m3.IntNumberPickerWidget
 import dev.ujhhgtg.wekit.ui.content.m3.SegmentedColumn
 import dev.ujhhgtg.wekit.ui.content.m3.SwitchWidget
 import kotlinx.coroutines.launch
@@ -62,6 +67,8 @@ fun WeAgentHomeScreen(onOpen: (AgentSettingsRoute) -> Unit) {
     var defaultModelId by remember { mutableStateOf<String?>(null) }
     var defaultSystemPromptId by remember { mutableStateOf<String?>(null) }
     var defaultPermissionLevel by remember { mutableStateOf(PermissionLevel.REQUEST_APPROVAL) }
+    var llmRequestTimeoutSec by remember { mutableIntStateOf(WeAgentSettings.DEFAULT_LLM_REQUEST_TIMEOUT_SEC) }
+    var llmConnectTimeoutSec by remember { mutableIntStateOf(WeAgentSettings.DEFAULT_LLM_CONNECT_TIMEOUT_SEC) }
 
     // These must come from the live DB flows, not a one-shot read: a model/prompt/environment added
     // on a child screen has to show up in these dropdowns as soon as the user comes back, no
@@ -81,6 +88,8 @@ fun WeAgentHomeScreen(onOpen: (AgentSettingsRoute) -> Unit) {
         defaultModelId = WeAgentSettings.defaultModelId()
         defaultSystemPromptId = WeAgentSettings.defaultSystemPromptId()
         defaultPermissionLevel = WeAgentSettings.defaultPermissionLevel()
+        llmRequestTimeoutSec = WeAgentSettings.llmRequestTimeoutSec()
+        llmConnectTimeoutSec = WeAgentSettings.llmConnectTimeoutSec()
         loaded = true
     }
 
@@ -151,6 +160,44 @@ fun WeAgentHomeScreen(onOpen: (AgentSettingsRoute) -> Unit) {
                                 scope.launch { WeAgentSettings.set(WeAgentSettings.KEY_SEND_WHILE_RUNNING, mode.name) }
                             },
                         )
+                    }
+                    // Timeouts are stored in seconds and committed on change: the shared model client
+                    // is rebuilt from these on its next use, so an edit applies without a restart.
+                    item {
+                        BaseItemContainer {
+                            IntNumberPickerWidget(
+                                icon = MaterialSymbols.Outlined.Schedule,
+                                title = stringResource(R.string.agent_llm_request_timeout_title),
+                                description = stringResource(R.string.agent_llm_request_timeout_summary),
+                                value = llmRequestTimeoutSec,
+                                startInt = WeAgentSettings.MIN_LLM_REQUEST_TIMEOUT_SEC,
+                                endInt = WeAgentSettings.MAX_LLM_REQUEST_TIMEOUT_SEC,
+                                stepSize = 30,
+                                valueSuffix = "s",
+                                onValueChange = {
+                                    llmRequestTimeoutSec = it
+                                    scope.launch { WeAgentSettings.set(WeAgentSettings.KEY_LLM_REQUEST_TIMEOUT_SEC, it.toString()) }
+                                },
+                            )
+                        }
+                    }
+                    item {
+                        BaseItemContainer {
+                            IntNumberPickerWidget(
+                                icon = MaterialSymbols.Outlined.Sync,
+                                title = stringResource(R.string.agent_llm_connect_timeout_title),
+                                description = stringResource(R.string.agent_llm_connect_timeout_summary),
+                                value = llmConnectTimeoutSec,
+                                startInt = WeAgentSettings.MIN_LLM_CONNECT_TIMEOUT_SEC,
+                                endInt = WeAgentSettings.MAX_LLM_CONNECT_TIMEOUT_SEC,
+                                stepSize = 5,
+                                valueSuffix = "s",
+                                onValueChange = {
+                                    llmConnectTimeoutSec = it
+                                    scope.launch { WeAgentSettings.set(WeAgentSettings.KEY_LLM_CONNECT_TIMEOUT_SEC, it.toString()) }
+                                },
+                            )
+                        }
                     }
                 }
             }

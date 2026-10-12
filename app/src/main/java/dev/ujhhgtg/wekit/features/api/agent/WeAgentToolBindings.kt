@@ -28,6 +28,15 @@ object WeAgentToolBindings {
     private fun Result<Unit>.renderOk(okMessage: String = "OK"): String =
         render { okMessage }
 
+    /**
+     * Parses a msgSvrId tool argument. The parameter is declared as a plain `String` in the tool
+     * schema so the model never round-trips a 64-bit server id through a JSON number (float64
+     * precision loss / scientific notation). The raw value is echoed back on failure so the model
+     * can self-correct instead of silently retrying with the same bad id.
+     */
+    private fun invalidMsgSvrId(raw: String): String =
+        "Error: invalid msgSvrId '$raw', expected a decimal number"
+
     // ---------------------------------------------------------------------
     // Read-only tools (sideEffect = false)
     // ---------------------------------------------------------------------
@@ -53,7 +62,7 @@ object WeAgentToolBindings {
         @AgentToolParam("1-based page index; defaults to 1") pageIndex: Int?,
         @AgentToolParam("page size; defaults to 20") pageSize: Int?,
     ): String = WeChatService.listMessages(convId, pageIndex ?: 1, pageSize ?: 20).render { list ->
-        if (list.isEmpty()) "No messages." else list.joinToString("\n") { "${it.sender}: ${it.content}" }
+        if (list.isEmpty()) "No messages." else list.joinToString("\n") { "${it.sender} [msgSvrId=${it.serverId}]: ${it.content}" }
     }
 
     @AgentTool(name = "get-group-members", description = "List all members of a group (id must end with @chatroom).", sideEffect = false)
@@ -105,8 +114,11 @@ object WeAgentToolBindings {
         sideEffect = false
     )
     fun cacheImage(
-        @AgentToolParam("Server id (msgSvrId) of the image message to cache") msgSvrId: Long,
-    ): String = WeChatService.cacheImage(msgSvrId).render { "path=$it" }
+        @AgentToolParam("Server id (msgSvrId) of the image message to cache, as a decimal string (as shown by get-chat-history)") msgSvrId: String,
+    ): String {
+        val id = msgSvrId.trim().toLongOrNull() ?: return invalidMsgSvrId(msgSvrId)
+        return WeChatService.cacheImage(id).render { "path=$it" }
+    }
 
     @AgentTool(
         name = "download-image",
@@ -114,8 +126,11 @@ object WeAgentToolBindings {
         sideEffect = false
     )
     fun downloadImage(
-        @AgentToolParam("Server id (msgSvrId) of the image message to download") msgSvrId: Long,
-    ): String = WeChatService.downloadImage(msgSvrId).render { "path=$it" }
+        @AgentToolParam("Server id (msgSvrId) of the image message to download, as a decimal string (as shown by get-chat-history)") msgSvrId: String,
+    ): String {
+        val id = msgSvrId.trim().toLongOrNull() ?: return invalidMsgSvrId(msgSvrId)
+        return WeChatService.downloadImage(id).render { "path=$it" }
+    }
 
     @AgentTool(
         name = "download-sticker",
@@ -123,8 +138,11 @@ object WeAgentToolBindings {
         sideEffect = false
     )
     fun downloadSticker(
-        @AgentToolParam("Server id (msgSvrId) of the sticker message to download") msgSvrId: Long,
-    ): String = WeChatService.downloadSticker(msgSvrId).render { "path=$it" }
+        @AgentToolParam("Server id (msgSvrId) of the sticker message to download, as a decimal string (as shown by get-chat-history)") msgSvrId: String,
+    ): String {
+        val id = msgSvrId.trim().toLongOrNull() ?: return invalidMsgSvrId(msgSvrId)
+        return WeChatService.downloadSticker(id).render { "path=$it" }
+    }
 
     @AgentTool(
         name = "download-voice",
@@ -132,8 +150,11 @@ object WeAgentToolBindings {
         sideEffect = false
     )
     fun downloadVoice(
-        @AgentToolParam("Server id (msgSvrId) of the voice message to download") msgSvrId: Long,
-    ): String = WeChatService.downloadVoice(msgSvrId).render { "path=$it" }
+        @AgentToolParam("Server id (msgSvrId) of the voice message to download, as a decimal string (as shown by get-chat-history)") msgSvrId: String,
+    ): String {
+        val id = msgSvrId.trim().toLongOrNull() ?: return invalidMsgSvrId(msgSvrId)
+        return WeChatService.downloadVoice(id).render { "path=$it" }
+    }
 
     @AgentTool(
         name = "cache-file",
@@ -141,9 +162,12 @@ object WeAgentToolBindings {
         sideEffect = false
     )
     fun cacheFile(
-        @AgentToolParam("Server id (msgSvrId) of the file message to cache") msgSvrId: Long,
+        @AgentToolParam("Server id (msgSvrId) of the file message to cache, as a decimal string (as shown by get-chat-history)") msgSvrId: String,
         @AgentToolParam("Conversation ID (wxId / talker) of the conversation the message belongs to; can be empty, if empty, the module tries to auto-detect the convId.") convId: String,
-    ): String = WeChatService.cacheFile(msgSvrId, convId.ifEmpty { null }).render { "path=$it" }
+    ): String {
+        val id = msgSvrId.trim().toLongOrNull() ?: return invalidMsgSvrId(msgSvrId)
+        return WeChatService.cacheFile(id, convId.ifEmpty { null }).render { "path=$it" }
+    }
 
     @AgentTool(
         name = "download-file",
@@ -151,9 +175,12 @@ object WeAgentToolBindings {
         sideEffect = false
     )
     fun downloadFile(
-        @AgentToolParam("Server id (msgSvrId) of the file message to download") msgSvrId: Long,
+        @AgentToolParam("Server id (msgSvrId) of the file message to download, as a decimal string (as shown by get-chat-history)") msgSvrId: String,
         @AgentToolParam("Conversation ID (wxId / talker) of the conversation the message belongs to; can be empty, if empty, the module tries to auto-detect the convId.") convId: String,
-    ): String = WeChatService.downloadFile(msgSvrId, convId.ifEmpty { null }).render { "path=$it" }
+    ): String {
+        val id = msgSvrId.trim().toLongOrNull() ?: return invalidMsgSvrId(msgSvrId)
+        return WeChatService.downloadFile(id, convId.ifEmpty { null }).render { "path=$it" }
+    }
 
     @AgentTool(
         name = "query-database",

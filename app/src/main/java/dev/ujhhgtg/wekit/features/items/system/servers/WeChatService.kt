@@ -57,6 +57,8 @@ object WeChatService {
         val sender: String,
         val content: String,
         val type: String,
+        /** 服务端消息 id (message.msgSvrId); 0 表示未知。带默认值以兼容旧数据反序列化。 */
+        val serverId: Long = 0L,
     )
 
     @Serializable
@@ -534,7 +536,7 @@ object WeChatService {
                 val content = if (isText) msg.content else "<type:$typeStr>"
                 sender to content
             }
-            MessageInfo(sender, content, typeStr)
+            MessageInfo(sender, content, typeStr, serverId = msg.msgSvrId)
         }
         return Result.Success(messages)
     }

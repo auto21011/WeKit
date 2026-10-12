@@ -282,4 +282,5 @@ Prefer these over raw Compose controls:
 ## CI
 
 - GitHub Actions: builds on push/PR to `master`/`dev` (skips non-code changes)
-- Artifacts automatically published to a release named "CI" + Telegram channel
+- Compile/verify jobs (`build`, `dex-test`) run on any repository, including forks
+- Publishing jobs (CI/Extensions/Dex-Test releases bot publishing) remain upstream-only (`Ujhhgtg/WeKit-Dev`)

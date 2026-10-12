@@ -33,25 +33,81 @@ object WeAgentSettings {
     const val KEY_NATIVE_LINUX_ENVIRONMENT_VARIABLES = "native_linux_environment_variables"
     const val KEY_SEND_WHILE_RUNNING = "send_while_running"         // QUEUE_AFTER_TURN | QUEUE_AS_STEER
     const val KEY_OVERLAY_MODE = "overlay_mode"                     // DISABLED | FOREGROUND_ONLY | ALWAYS
+    const val KEY_LLM_REQUEST_TIMEOUT_SEC = "llm_request_timeout_sec" // whole model call, streaming included
+    const val KEY_LLM_CONNECT_TIMEOUT_SEC = "llm_connect_timeout_sec" // TCP connect to the model endpoint
 
     /** Superseded by [KEY_OVERLAY_MODE]; still read once for migration of existing installs. */
     const val KEY_OVERLAY_FOREGROUND_ONLY = "overlay_foreground_only"
 
+    // Factory defaults and bounds for the LLM network timeouts. The settings slider and the Ktor
+    // client builder both read these, so the two can never drift apart; the defaults reproduce the
+    // timeouts that used to be hard-coded in the model client (600_000 ms request/socket and
+    // 30_000 ms connect), so existing installs keep exactly the previous behavior.
+    const val DEFAULT_LLM_REQUEST_TIMEOUT_SEC = 600
+    const val MIN_LLM_REQUEST_TIMEOUT_SEC = 60
+    const val MAX_LLM_REQUEST_TIMEOUT_SEC = 1800
+    const val DEFAULT_LLM_CONNECT_TIMEOUT_SEC = 30
+    const val MIN_LLM_CONNECT_TIMEOUT_SEC = 5
+    const val MAX_LLM_CONNECT_TIMEOUT_SEC = 120
+
+    /**
+     * Timeout values as of the last suspend-side read. [dev.ujhhgtg.wekit.agent.model.ModelProviderManager]
+     * selects its shared HTTP client from a synchronous getter, so it reads this snapshot instead of
+     * the DB; [load], [set] and [clear] refresh it whenever the stored values can have changed.
+     * Starts at the factory defaults, which is also what an install without stored rows gets.
+     */
+    @Volatile
+    private var llmRequestTimeoutSecCache = DEFAULT_LLM_REQUEST_TIMEOUT_SEC
+
+    @Volatile
+    private var llmConnectTimeoutSecCache = DEFAULT_LLM_CONNECT_TIMEOUT_SEC
+
+    /** Synchronous read of the last resolved model request timeout, in seconds. */
+    val llmRequestTimeoutSecSnapshot: Int get() = llmRequestTimeoutSecCache
+
+    /** Synchronous read of the last resolved model connect timeout, in seconds. */
+    val llmConnectTimeoutSecSnapshot: Int get() = llmConnectTimeoutSecCache
+
     suspend fun load() {
         cache.clear()
+        refreshLlmTimeoutSnapshot()
     }
+
+    /**
+     * Re-reads both timeout settings into the synchronous snapshot. Called from every suspend path
+     * that can change them — [load] at startup, [set]/[clear] on a settings edit — which is what
+     * makes the shared HTTP client pick up a new timeout on its next use.
+     */
+    private suspend fun refreshLlmTimeoutSnapshot() {
+        llmRequestTimeoutSecCache = llmRequestTimeoutSec()
+        llmConnectTimeoutSecCache = llmConnectTimeoutSec()
+    }
+
+    /** Model request timeout in seconds (the whole call, streaming included), clamped to the supported range. */
+    suspend fun llmRequestTimeoutSec(): Int =
+        get(KEY_LLM_REQUEST_TIMEOUT_SEC)?.toIntOrNull()
+            ?.coerceIn(MIN_LLM_REQUEST_TIMEOUT_SEC, MAX_LLM_REQUEST_TIMEOUT_SEC)
+            ?: DEFAULT_LLM_REQUEST_TIMEOUT_SEC
+
+    /** Model TCP connect timeout in seconds, clamped to the supported range. */
+    suspend fun llmConnectTimeoutSec(): Int =
+        get(KEY_LLM_CONNECT_TIMEOUT_SEC)?.toIntOrNull()
+            ?.coerceIn(MIN_LLM_CONNECT_TIMEOUT_SEC, MAX_LLM_CONNECT_TIMEOUT_SEC)
+            ?: DEFAULT_LLM_CONNECT_TIMEOUT_SEC
 
     private suspend fun get(key: String): String? = cache[key] ?: db.settingDao().getValue(key)?.also { cache[key] = it }
 
     suspend fun set(key: String, value: String) {
         db.settingDao().upsert(SettingEntity(key, value))
         cache[key] = value
+        if (key == KEY_LLM_REQUEST_TIMEOUT_SEC || key == KEY_LLM_CONNECT_TIMEOUT_SEC) refreshLlmTimeoutSnapshot()
     }
 
     /** Deletes the row for [key] and drops it from the in-memory cache together. */
     suspend fun clear(key: String) {
         db.settingDao().delete(key)
         cache.remove(key)
+        if (key == KEY_LLM_REQUEST_TIMEOUT_SEC || key == KEY_LLM_CONNECT_TIMEOUT_SEC) refreshLlmTimeoutSnapshot()
     }
 
     /**

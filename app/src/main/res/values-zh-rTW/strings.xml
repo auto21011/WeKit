@@ -182,6 +182,10 @@
     <string name="agent_send_while_running_title">運行中發送行爲</string>
     <string name="agent_send_queue_after_turn">隊列（本輪結束後發送）</string>
     <string name="agent_send_steer_next_request">引導（下次請求前插入）</string>
+    <string name="agent_llm_request_timeout_title">模型請求超時</string>
+    <string name="agent_llm_request_timeout_summary">單次模型調用的最長時長，含流式輸出</string>
+    <string name="agent_llm_connect_timeout_title">模型連接超時</string>
+    <string name="agent_llm_connect_timeout_summary">與模型服務器建立連接的最長時長</string>
     <string name="agent_section_tools">工具</string>
     <string name="agent_mcp_servers_title">MCP 服務器</string>
     <string name="agent_mcp_servers_summary">添加 Streamable HTTP / SSE 服務器</string>

@@ -2,6 +2,7 @@ package dev.ujhhgtg.wekit.agent.model
 
 import dev.ujhhgtg.wekit.BuildConfig
 import dev.ujhhgtg.wekit.agent.data.WeAgentRepository
+import dev.ujhhgtg.wekit.agent.data.WeAgentSettings
 import dev.ujhhgtg.wekit.agent.data.entity.ModelEntity
 import dev.ujhhgtg.wekit.agent.data.entity.ModelProviderEntity
 import dev.ujhhgtg.wekit.agent.data.entity.ModelProviderType
@@ -25,37 +26,96 @@ import kotlinx.serialization.json.jsonPrimitive
  * into a ready-to-send [LlmRequest] shell (model id + reasoning gear + custom-JSON override).
  *
  * One shared [HttpClient] (Ktor CIO) is reused across all adapters, mirroring [dev.ujhhgtg.wekit.utils.EdgeTtsClient]'s
- * singleton pattern. A long read timeout accommodates slow streaming completions.
+ * singleton pattern. Request/socket/connect timeouts come from the user setting (see
+ * [WeAgentSettings.llmRequestTimeoutSecSnapshot]) and default to the long read timeout that
+ * accommodates slow streaming completions; editing the setting rebuilds the client, so the new
+ * values apply from the next request on without restarting WeChat.
  */
 object ModelProviderManager {
 
-    private val httpClient = HttpClient(CIO) {
+    /**
+     * The most recently built shared client; [sharedRequestTimeoutSec] and [sharedConnectTimeoutSec]
+     * record the timeout pair it was built with. Read through [httpClient], which swaps in a fresh
+     * instance as soon as the settings snapshot no longer matches.
+     */
+    @Volatile
+    private var sharedHttpClient: HttpClient? = null
+
+    @Volatile
+    private var sharedRequestTimeoutSec = WeAgentSettings.DEFAULT_LLM_REQUEST_TIMEOUT_SEC
+
+    @Volatile
+    private var sharedConnectTimeoutSec = WeAgentSettings.DEFAULT_LLM_CONNECT_TIMEOUT_SEC
+
+    /**
+     * The shared Ktor CIO client, rebuilt when the configured timeouts change. The superseded
+     * instance is deliberately left open instead of being closed: a background turn may still be
+     * streaming on it, and closing the engine would abort that stream mid-response. Nothing is
+     * dispatched to it afterwards, so it only holds idle keep-alive sockets, and one client is
+     * abandoned per timeout value actually used by a request — at most a handful per WeChat run.
+     */
+    private val httpClient: HttpClient
+        get() = synchronized(this) {
+            val requestTimeoutSec = WeAgentSettings.llmRequestTimeoutSecSnapshot
+            val connectTimeoutSec = WeAgentSettings.llmConnectTimeoutSecSnapshot
+            val cached = sharedHttpClient
+            if (cached != null &&
+                requestTimeoutSec == sharedRequestTimeoutSec &&
+                connectTimeoutSec == sharedConnectTimeoutSec
+            ) {
+                cached
+            } else {
+                buildHttpClient(requestTimeoutSec, connectTimeoutSec).also {
+                    sharedHttpClient = it
+                    sharedRequestTimeoutSec = requestTimeoutSec
+                    sharedConnectTimeoutSec = connectTimeoutSec
+                }
+            }
+        }
+
+    private fun buildHttpClient(requestTimeoutSec: Int, connectTimeoutSec: Int): HttpClient = HttpClient(CIO) {
         install(UserAgent) {
             agent = "WeAgent/${BuildConfig.VERSION_NAME}"
         }
         install(HttpTimeout) {
-            requestTimeoutMillis = 600_000
-            socketTimeoutMillis = 600_000
-            connectTimeoutMillis = 30_000
+            // Socket idle timeout tracks the request timeout: the original hard-coded pair was
+            // 600_000 ms for both, and a stream that stalls for the whole request budget is dead.
+            requestTimeoutMillis = requestTimeoutSec * 1000L
+            socketTimeoutMillis = requestTimeoutSec * 1000L
+            connectTimeoutMillis = connectTimeoutSec * 1000L
         }
     }
 
-    // providerId -> adapter, rebuilt when the provider's config changes.
+    // providerId -> adapter, rebuilt when the provider's config or the configured timeouts change.
     private val clientCache = HashMap<String, CachedClient>()
 
-    private data class CachedClient(val configHash: Int, val client: LlmClient)
+    private data class CachedClient(
+        val configHash: Int,
+        val requestTimeoutSec: Int,
+        val connectTimeoutSec: Int,
+        val client: LlmClient,
+    )
 
     /**
-     * Returns an [LlmClient] for [provider], building one if absent or if the provider's config
-     * (type/baseUrl/apiKey) changed since last cached. [provider] must carry a usable apiKey (use
-     * [WeAgentRepository.getModelProvider]); keys are stored as-is, so nothing needs decrypting.
+     * Returns an [LlmClient] for [provider], building one if it is absent, if the provider's config
+     * (type/baseUrl/apiKey) changed, or if the configured timeouts changed since it was cached
+     * (an adapter holds the [HttpClient] it was built with, so a new timeout needs a new adapter).
+     * [provider] must carry a usable apiKey (use [WeAgentRepository.getModelProvider]); keys are
+     * stored as-is, so nothing needs decrypting.
      */
     @Synchronized
     fun clientFor(provider: ModelProviderEntity): LlmClient {
+        val requestTimeoutSec = WeAgentSettings.llmRequestTimeoutSecSnapshot
+        val connectTimeoutSec = WeAgentSettings.llmConnectTimeoutSecSnapshot
         val hash = provider.type.hashCode() * 31 + provider.baseUrl.hashCode() * 31 + provider.apiKey.hashCode()
-        clientCache[provider.id]?.let { if (it.configHash == hash) return it.client }
+        clientCache[provider.id]?.let {
+            if (it.configHash == hash &&
+                it.requestTimeoutSec == requestTimeoutSec &&
+                it.connectTimeoutSec == connectTimeoutSec
+            ) return it.client
+        }
         val client = build(provider)
-        clientCache[provider.id] = CachedClient(hash, client)
+        clientCache[provider.id] = CachedClient(hash, requestTimeoutSec, connectTimeoutSec, client)
         return client
     }
 
