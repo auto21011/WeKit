@@ -141,6 +141,26 @@ jobs:
           uv run --no-sync --project wekit-zygisk python wekit-zygisk/native/tests/arm64_relocation.py
           ./x i18n-check
 
+      - name: Restore LSParanoid toolchain cache
+        # Keeps the ~50 MB O-MVLL installation and downloaded archives warm across runs unless
+        # the plugin pins a new version; tools/setup-native-toolchain.py verifies checksums
+        # and never replaces a valid installation.
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cache/lspeciallyparanoid/toolchains
+            ~/.local/share/lspeciallyparanoid/toolchains
+          key: lsparanoid-toolchain-${{ runner.os }}-ndk29-omvll1.9.1
+
+      - name: Install LSParanoid native toolchain
+        # The native protection backend compiles WeKit's Rust native lib with O-MVLL using the
+        # plugin's pinned NDK r29 (WeKit itself builds with NDK 30). The script installs
+        # $HOME/.local/share/lspeciallyparanoid/toolchains/omvll-1.9.1, which is the exact path
+        # the plugin resolves by default, and reuses the sdkmanager-provided NDK.
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;29.0.14206865"
+          python3 .wekit/lsparanoid/tools/setup-native-toolchain.py --sdk "$ANDROID_HOME"
+
       - name: Decode keystore
         if: github.event_name != 'pull_request'
         run: |
