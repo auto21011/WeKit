@@ -60,8 +60,8 @@ jobs:
         # this checkout (via WEKIT_LSPARANOID_CHECKOUT) to supply the plugin and :runtime.
         uses: actions/checkout@v7
         with:
-          repository: Ujhhgtg/LSpeciallyParanoid
-          ref: 843baeaf1b79d852e981a537f939a711fba68665
+          repository: auto21011/LSpeciallyParanoid
+          ref: for-wekit-ci
           path: .wekit/lsparanoid
 
 
@@ -232,8 +232,8 @@ jobs:
         # this checkout (via WEKIT_LSPARANOID_CHECKOUT) to supply the plugin and :runtime.
         uses: actions/checkout@v7
         with:
-          repository: Ujhhgtg/LSpeciallyParanoid
-          ref: 843baeaf1b79d852e981a537f939a711fba68665
+          repository: auto21011/LSpeciallyParanoid
+          ref: for-wekit-ci
           path: .wekit/lsparanoid
 
 
@@ -488,8 +488,8 @@ jobs:
         # this checkout (via WEKIT_LSPARANOID_CHECKOUT) to supply the plugin and :runtime.
         uses: actions/checkout@v7
         with:
-          repository: Ujhhgtg/LSpeciallyParanoid
-          ref: 843baeaf1b79d852e981a537f939a711fba68665
+          repository: auto21011/LSpeciallyParanoid
+          ref: for-wekit-ci
           path: .wekit/lsparanoid
 
 
@@ -713,8 +713,8 @@ jobs:
         # this checkout (via WEKIT_LSPARANOID_CHECKOUT) to supply the plugin and :runtime.
         uses: actions/checkout@v7
         with:
-          repository: Ujhhgtg/LSpeciallyParanoid
-          ref: 843baeaf1b79d852e981a537f939a711fba68665
+          repository: auto21011/LSpeciallyParanoid
+          ref: for-wekit-ci
           path: .wekit/lsparanoid
 
 
