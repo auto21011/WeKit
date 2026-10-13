@@ -162,12 +162,26 @@ jobs:
           python3 .wekit/lsparanoid/tools/setup-native-toolchain.py --sdk "$ANDROID_HOME"
 
       - name: Decode keystore
+        id: keystore
         if: github.event_name != 'pull_request'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > $RUNNER_TEMP/wekit-keystore.jks
+          # `secrets` is not an allowed context in step `if:` expressions, so the presence of the
+          # signing secret is published as a step output instead.
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/wekit-keystore.jks"
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
 
+      # Forks carry no signing secrets: the step env would expand to empty strings, which
+      # app/build.gradle.kts still counts as "keystore configured" and then fails loading an
+      # empty file. Repositories without KEYSTORE_BASE64 take the debug-signed path instead —
+      # the same path upstream pull requests already exercise.
       - name: Build Release (Signed)
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && steps.keystore.outputs.available == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           WEKIT_KEYSTORE_FILE: ${{ runner.temp }}/wekit-keystore.jks
@@ -176,8 +190,8 @@ jobs:
           WEKIT_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./x build --release
 
-      - name: Build Release (Unsigned)
-        if: github.event_name == 'pull_request'
+      - name: Build Release (Debug-signed)
+        if: github.event_name == 'pull_request' || steps.keystore.outputs.available != 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./x build --release
