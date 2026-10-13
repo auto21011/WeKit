@@ -32,6 +32,10 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Makes settings.gradle.kts include the LSParanoid checkout above as a composite build,
+      # which is the only way to obtain the unpublished dev.ujhhgtg.lsparanoid plugin.
+      WEKIT_LSPARANOID_CHECKOUT: ${{ github.workspace }}/.wekit/lsparanoid
     # Compile/verify on any repository, including forks. Publishing jobs stay upstream-only.
     if: |
       github.event_name == 'workflow_dispatch' ||
@@ -49,6 +53,17 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+
+      - name: Checkout LSParanoid plugin sources
+        # dev.ujhhgtg.lsparanoid is not published to any Maven repository, and the plugin's own
+        # README directs consumers to use a source composite build. settings.gradle.kts includes
+        # this checkout (via WEKIT_LSPARANOID_CHECKOUT) to supply the plugin and :runtime.
+        uses: actions/checkout@v7
+        with:
+          repository: Ujhhgtg/LSpeciallyParanoid
+          ref: 843baeaf1b79d852e981a537f939a711fba68665
+          path: .wekit/lsparanoid
+
 
       - name: Free disk space for build and caches
         # Cache uploads need space for a temporary archive after the APK build.
@@ -196,6 +211,10 @@ jobs:
 
   dex-test:
     runs-on: ubuntu-latest
+    env:
+      # Makes settings.gradle.kts include the LSParanoid checkout above as a composite build,
+      # which is the only way to obtain the unpublished dev.ujhhgtg.lsparanoid plugin.
+      WEKIT_LSPARANOID_CHECKOUT: ${{ github.workspace }}/.wekit/lsparanoid
     # Verification only: runs on any repository, including forks.
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev'
     outputs:
@@ -206,6 +225,17 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+
+      - name: Checkout LSParanoid plugin sources
+        # dev.ujhhgtg.lsparanoid is not published to any Maven repository, and the plugin's own
+        # README directs consumers to use a source composite build. settings.gradle.kts includes
+        # this checkout (via WEKIT_LSPARANOID_CHECKOUT) to supply the plugin and :runtime.
+        uses: actions/checkout@v7
+        with:
+          repository: Ujhhgtg/LSpeciallyParanoid
+          ref: 843baeaf1b79d852e981a537f939a711fba68665
+          path: .wekit/lsparanoid
+
 
       - name: Set up JDK 21
         uses: actions/setup-java@v5
@@ -431,6 +461,10 @@ jobs:
   build-extensions:
     needs: extensions-changes
     runs-on: ubuntu-latest
+    env:
+      # Makes settings.gradle.kts include the LSParanoid checkout above as a composite build,
+      # which is the only way to obtain the unpublished dev.ujhhgtg.lsparanoid plugin.
+      WEKIT_LSPARANOID_CHECKOUT: ${{ github.workspace }}/.wekit/lsparanoid
     # This dedicated publishing job is the only path that downloads the Arch rootfs.
     # Publishing is upstream-only: the workflow_dispatch branch below would otherwise
     # reach a fork and push to Ujhhgtg/WeKit with credentials it does not have.
@@ -447,6 +481,17 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+
+      - name: Checkout LSParanoid plugin sources
+        # dev.ujhhgtg.lsparanoid is not published to any Maven repository, and the plugin's own
+        # README directs consumers to use a source composite build. settings.gradle.kts includes
+        # this checkout (via WEKIT_LSPARANOID_CHECKOUT) to supply the plugin and :runtime.
+        uses: actions/checkout@v7
+        with:
+          repository: Ujhhgtg/LSpeciallyParanoid
+          ref: 843baeaf1b79d852e981a537f939a711fba68665
+          path: .wekit/lsparanoid
+
 
       - name: Set up JDK 21
         uses: actions/setup-java@v5
@@ -647,6 +692,10 @@ jobs:
   release-ci:
     needs: build
     runs-on: ubuntu-latest
+    env:
+      # Makes settings.gradle.kts include the LSParanoid checkout above as a composite build,
+      # which is the only way to obtain the unpublished dev.ujhhgtg.lsparanoid plugin.
+      WEKIT_LSPARANOID_CHECKOUT: ${{ github.workspace }}/.wekit/lsparanoid
     if: ${{ always() && needs.build.result == 'success' && github.repository == 'Ujhhgtg/WeKit-Dev' && github.event_name == 'push' && github.ref == 'refs/heads/master' }}
     permissions:
       contents: write
@@ -657,6 +706,17 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
+
+      - name: Checkout LSParanoid plugin sources
+        # dev.ujhhgtg.lsparanoid is not published to any Maven repository, and the plugin's own
+        # README directs consumers to use a source composite build. settings.gradle.kts includes
+        # this checkout (via WEKIT_LSPARANOID_CHECKOUT) to supply the plugin and :runtime.
+        uses: actions/checkout@v7
+        with:
+          repository: Ujhhgtg/LSpeciallyParanoid
+          ref: 843baeaf1b79d852e981a537f939a711fba68665
+          path: .wekit/lsparanoid
+
 
       - name: Download APK artifact
         uses: actions/download-artifact@v8

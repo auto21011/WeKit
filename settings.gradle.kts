@@ -5,7 +5,20 @@ enableFeaturePreview("NO_IMPLICIT_LOOKUP_IN_PARENT_PROJECTS")
 // (AbstractMethodError) — hence the module lives in extension-packs/.
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
+// The LSParanoid plugin (dev.ujhhgtg.lsparanoid) is deliberately not published to any Maven
+// repository, so a machine without it in mavenLocal cannot resolve it. Point this at a source
+// checkout to consume it as a composite build instead (CI clones it); when unset, resolution stays
+// exactly as before and falls back to mavenLocal.
+val lsparanoidCheckout: String? =
+    providers.environmentVariable("WEKIT_LSPARANOID_CHECKOUT").orNull?.trim()?.takeIf { it.isNotEmpty() }
+
 pluginManagement {
+    // Supplies the dev.ujhhgtg.lsparanoid plugin from the included build instead of the
+    // unpublished Maven artifact. Note: this block is compiled in its own scope, so it cannot
+    // read a val declared in the settings script body.
+    providers.environmentVariable("WEKIT_LSPARANOID_CHECKOUT").orNull
+        ?.trim()?.takeIf { it.isNotEmpty() }
+        ?.let { includeBuild(it) }
     repositories {
         mavenLocal { content { includeGroup("dev.ujhhgtg.lsparanoid") } }
         google {
@@ -74,6 +87,8 @@ rootProject.name = "wekit"
 // Composite build: scripta code editor (not published to Maven Central; keep its own
 // toolchain, plugins and version catalog).
 includeBuild("libs/common/scripta")
+// Substitutes dev.ujhhgtg.lsparanoid:core/runtime with the checkout's modules when present.
+lsparanoidCheckout?.let { includeBuild(it) }
 
 include(
     ":app",
